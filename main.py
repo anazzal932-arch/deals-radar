@@ -4,32 +4,32 @@ import re
 
 app = FastAPI()
 
-KEYWORDS = ["دينار", "JD"]
+KEYWORDS = ["عرض", "خصم", "دينار", "JD"]
 
 @app.get("/")
 def home():
-    return {"status": "Smart Deals Radar 🛰️ (Google RSS Mode)"}
+    return {"status": "Smart Deals Radar 🛰️ يعمل بنجاح"}
 
 def google_rss_search(query: str):
-    url = f"https://news.google.com/rss/search?q={query}+عرض+دينار+الأردن"
-    feed = feedparser.parse(url)
+    feed_url = f"https://news.google.com/rss/search?q={query}+عرض+دينار+الأردن"
+    feed = feedparser.parse(feed_url)
 
     deals = []
 
     for entry in feed.entries:
         text = entry.title + " " + entry.get("summary", "")
-        price_match = re.search(r"(\d+(\.\d+)?)\s?(دينار|JD)", text)
 
+        price_match = re.search(r"(\d+(\.\d+)?)\s?(دينار|JD)", text)
         if price_match:
             deals.append({
-                "المنتج": query,
-                "السعر": float(price_match.group(1)),
-                "المصدر": entry.source.title if "source" in entry else "Google",
                 "العنوان": entry.title,
+                "السعر": float(price_match.group(1)),
+                "المصدر": entry.source.title if hasattr(entry, "source") else "Google",
                 "الرابط": entry.link
             })
 
     return deals
+
 
 @app.get("/best-deal")
 def best_deal(query: str = "سكر"):
@@ -38,13 +38,14 @@ def best_deal(query: str = "سكر"):
     if not deals:
         return {
             "المنتج": query,
-            "النتيجة": "❌ لا يوجد عروض حالياً"
+            "النتيجة": "لا توجد عروض حالياً"
         }
 
     best = min(deals, key=lambda x: x["السعر"])
 
     return {
-        "المنتج": query,
+        "المنتج 🛒": query,
+        "عدد العروض المكتشفة 🔍": len(deals),
         "أفضل عرض 🏆": best,
-        "عدد العروض التي تم فحصها": len(deals)
+        "كل العروض 📋": deals[:5]  # أول 5 فقط
     }
