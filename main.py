@@ -4,7 +4,12 @@ from fastapi.responses import HTMLResponse
 import feedparser
 import re
 import urllib.parse
+from fastapi.templating import Jinja2Templates
+from fastapi.responses import HTMLResponse
+from fastapi import Request
 
+# إعداد الرابط بين الكود ومجلد القوالب
+templates = Jinja2Templates(directory="templates")
 app = FastAPI()
 
 # إعداد مجلد القوالب 📁
