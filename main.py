@@ -3,9 +3,12 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from playwright.async_api import async_playwright
 import urllib.parse
+import logging
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
+
+logging.basicConfig(level=logging.ERROR)
 
 async def fetch_image_deals(query: str, region: str = "الأردن"):
     """الرادار الذي يصطاد الصور من الإنترنت 🕸️"""
@@ -34,8 +37,8 @@ async def fetch_image_deals(query: str, region: str = "الأردن"):
             await browser.close()
             return deals
         except Exception as e:
-            print(f"خطأ في الرادار: {e}")
-            print(f"Traceback: {e.__traceback__}")
+            logging.error(f"خطأ في الرادار: {e}")
+            logging.error(f"Traceback: {e.__traceback__}")
             return []
 
 @app.get("/", response_class=HTMLResponse)
@@ -54,6 +57,6 @@ async def best_deal(request: Request, query: str = "عروض", region: str = "ا
             "deals": deals
         })
     except Exception as e:
-        print(f"خطأ في best_deal: {e}")
-        print(f"Traceback: {e.__traceback__}")
+        logging.error(f"خطأ في best_deal: {e}")
+        logging.error(f"Traceback: {e.__traceback__}")
         raise HTTPException(status_code=500, detail="حدث خطأ داخلي في الخادم.")
