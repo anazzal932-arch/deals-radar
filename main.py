@@ -1,55 +1,53 @@
 from fastapi import FastAPI, Request
 from fastapi.templating import Jinja2Templates
-from fastapi.responses import HTMLResponse
-import feedparser
-import re
-import urllib.parse
+from playwright.async_api import async_playwright
+import asyncio
 
 app = FastAPI()
 
-# إخبار السيرفر بمكان مجلد القوالب 📁
+# إعداد المجلد الذي يحتوي على صفحات HTML
 templates = Jinja2Templates(directory="templates")
 
-def extract_price(text):
-    # صنارة البحث عن الأسعار 🎣
-    price_pattern = r"([\d\u0660-\u0669]+(\.[\d\u0660-\u0669]+)?)\s?(دينار|JD|JOD|د\.أ)"
-    match = re.search(price_pattern, text)
-    if match:
-        p_str = match.group(1)
-        translation = str.maketrans("٠١٢٣٤٥٦٧٨٩", "0123456789")
-        try:
-            return float(p_str.translate(translation))
-        except:
-            return None
-    return None
+async def fetch_carrefour_deals():
+    """هذه الدالة هي 'الرادار' الذي يبحث في جوجل ويصطاد الصور"""
+    async with async_playwright() as p:
+        # تشغيل متصفح خفي (لا يراه المستخدم)
+        browser = await p.chromium.launch(headless=True)
+        page = await browser.new_page()
+        
+        # البحث عن عروض كارفور الأردن 2026 مع فلتر 'آخر أسبوع' باستخدام tbs=qdr:w
+        search_query = "عروض كارفور الأردن 2026"
+        url = f"https://www.google.com/search?q={search_query}&tbm=isch&tbs=qdr:w"
+        
+        await page.goto(url)
+        
+        # الانتظار حتى تظهر الصور في الصفحة
+        await page.wait_for_selector("img")
+        
+        # استخراج روابط أول 5 صور
+        images = await page.query_selector_all("img")
+        image_urls = []
+        
+        for img in images:
+            src = await img.get_attribute("src")
+            # نتأكد أن الرابط يبدأ بـ http لضمان أنه رابط صورة حقيقي
+            if src and src.startswith("http") and len(image_urls) < 5:
+                image_urls.append(src)
+        
+        await browser.close()
+        return image_urls
 
-@app.get("/", response_class=HTMLResponse)
-def home(request: Request):
-    # عرض الصفحة الرئيسية
-    return templates.TemplateResponse("index.html", {"request": request, "query": "ابحث الآن", "results": []})
-
-@app.get("/best-deal", response_class=HTMLResponse)
-def best_deal(request: Request, query: str = "زيت"):
-    encoded_query = urllib.parse.quote(f"{query} عروض الأردن")
-    url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ar&gl=JO&ceid=JO:ar"
-    
-    feed = feedparser.parse(url)
-    results = []
-
-    for entry in feed.entries[:10]:
-        price = extract_price(entry.title + " " + entry.get("summary", ""))
-        results.append({
-            "المنتج 🛒": entry.title.split(" - ")[0], 
-            "السعر 💰": f"{price} دينار" if price else "راجع الرابط",
-            "المصدر 🏛️": entry.source.title if hasattr(entry, 'source') else "جوجل",
-            "الرابط 🔗": entry.link
-        })
-    
-    # ترتيب النتائج 📉
-    sorted_results = sorted(results, key=lambda x: (x["السعر 💰"] == "راجع الرابط", x["السعر 💰"]))
+@app.get("/")
+async def read_root(request: Request):
+    """هذه الدالة تعمل عند فتح الموقع وترسل الصور للقالب"""
+    try:
+        # استدعاء الرادار لجلب الصور
+        deals_images = await fetch_carrefour_deals()
+    except Exception as e:
+        print(f"حدث خطأ أثناء البحث: {e}")
+        deals_images = [] # في حال حدث خطأ نرسل قائمة فارغة
 
     return templates.TemplateResponse("index.html", {
-        "request": request,
-        "query": query,
-        "results": sorted_results
+        "request": request, 
+        "deals": deals_images
     })
