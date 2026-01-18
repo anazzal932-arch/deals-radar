@@ -5,11 +5,18 @@ import re
 
 app = FastAPI()
 
-# سنركز الاختبار الآن على عقرباوي مول 🛒
-TEST_STORE = {"name": "عقرباوي مول", "url": "https://www.facebook.com/AqrabawiMall/"}
+# سنستخدم هذا الرابط كمختبر للتأكد من أن الرادار "يصطاد" بنجاح 🎣
+TEST_STORE = {
+    "name": "عروض الأردن (عقرباوي مول وغيره)", 
+    "url": "https://3rodh.com/jordan-offers"
+}
+
+@app.get("/")
+def home():
+    return {"message": "الرادار جاهز للاختبار! اذهب إلى /deals"}
 
 @app.get("/deals")
-def test_deals():
+def get_deals():
     all_results = []
     headers = {
         'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36'
@@ -19,15 +26,16 @@ def test_deals():
         response = requests.get(TEST_STORE["url"], headers=headers, timeout=15)
         soup = BeautifulSoup(response.content, 'html.parser')
         
-        # لنحاول استخراج أي نص يحتوي على أرقام أو كلمات متعلقة بالأسعار
-        for element in soup.find_all(['span', 'p', 'div']):
+        # البحث عن نصوص العروض والأسعار 🏷️
+        for element in soup.find_all(['h2', 'h3', 'p', 'span']):
             text = element.get_text(strip=True)
-            if any(key in text for key in ["دينار", "JD", "JOD", "سعر"]):
+            # إذا وجدنا كلمة "عرض" أو "دينار" أو "JD"
+            if any(key in text for key in ["عرض", "دينار", "JD", "JOD"]):
                 all_results.append({
-                    "المحل": TEST_STORE["name"],
-                    "النص الملتقط": text[:100]
+                    "المصدر 🏪": TEST_STORE["name"],
+                    "التفاصيل 📄": text[:80]
                 })
     except Exception as e:
-        return {"error": str(e)}
+        return {"error": f"مشكلة في الاتصال: {str(e)}"}
 
-    return all_results if all_results else {"message": "الرادار لم يجد نصوصاً واضحة، قد تحتاج الصفحة لتقنية محاكاة المتصفح"}
+    return all_results if all_results else {"status": "empty", "message": "لم يتم العثور على نصوص تطابق البحث"}
