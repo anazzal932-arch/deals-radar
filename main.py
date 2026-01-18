@@ -4,50 +4,46 @@ from playwright.async_api import async_playwright
 import asyncio
 
 app = FastAPI()
-
-# إعداد المجلد الذي يحتوي على صفحات HTML
 templates = Jinja2Templates(directory="templates")
 
 async def fetch_carrefour_deals():
-    """هذه الدالة هي 'الرادار' الذي يبحث في جوجل ويصطاد الصور"""
+    """الرادار الذي يبحث في جوجل كروم عن أحدث العروض"""
     async with async_playwright() as p:
-        # تشغيل متصفح خفي (لا يراه المستخدم)
+        # تشغيل المتصفح (Chromium هو المحرك المشغل لكروم)
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # البحث عن عروض كارفور الأردن 2026 مع فلتر 'آخر أسبوع' باستخدام tbs=qdr:w
-        search_query = "عروض كارفور الأردن 2026"
-        url = f"https://www.google.com/search?q={search_query}&tbm=isch&tbs=qdr:w"
+        # البحث عن عروض كارفور الأردن 2026 
+        # tbs=qdr:w تضمن أن الصور من 'آخر أسبوع' فقط
+        url = "https://www.google.com/search?q=عروض+كارفور+الأردن+2026&tbm=isch&tbs=qdr:w"
         
-        await page.goto(url)
-        
-        # الانتظار حتى تظهر الصور في الصفحة
-        await page.wait_for_selector("img")
-        
-        # استخراج روابط أول 5 صور
-        images = await page.query_selector_all("img")
-        image_urls = []
-        
-        for img in images:
-            src = await img.get_attribute("src")
-            # نتأكد أن الرابط يبدأ بـ http لضمان أنه رابط صورة حقيقي
-            if src and src.startswith("http") and len(image_urls) < 5:
-                image_urls.append(src)
-        
-        await browser.close()
-        return image_urls
+        try:
+            await page.goto(url, timeout=60000)
+            await page.wait_for_selector("img", timeout=10000)
+            
+            # استخراج روابط الصور
+            images = await page.query_selector_all("img")
+            image_urls = []
+            
+            for img in images:
+                src = await img.get_attribute("src")
+                # نتجنب الصور الصغيرة جداً (Base64) ونأخذ الروابط الحقيقية
+                if src and src.startswith("http") and len(image_urls) < 5:
+                    image_urls.append(src)
+            
+            await browser.close()
+            return image_urls
+        except Exception as e:
+            print(f"Error: {e}")
+            await browser.close()
+            return []
 
 @app.get("/")
 async def read_root(request: Request):
-    """هذه الدالة تعمل عند فتح الموقع وترسل الصور للقالب"""
-    try:
-        # استدعاء الرادار لجلب الصور
-        deals_images = await fetch_carrefour_deals()
-    except Exception as e:
-        print(f"حدث خطأ أثناء البحث: {e}")
-        deals_images = [] # في حال حدث خطأ نرسل قائمة فارغة
-
+    # تشغيل الرادار لجلب أحدث 5 صفحات
+    deals_images = await fetch_carrefour_deals()
+    
     return templates.TemplateResponse("index.html", {
-        "request": request, 
+        "request": request,
         "deals": deals_images
     })
