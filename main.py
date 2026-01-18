@@ -1,4 +1,4 @@
-from fastapi import FastAPI, Request
+from fastapi import FastAPI, Request, HTTPException
 from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from playwright.async_api import async_playwright
@@ -30,7 +30,8 @@ async def fetch_image_deals(query: str):
             
             await browser.close()
             return links
-        except:
+        except Exception as e:
+            print(f"Error fetching image deals: {e}")
             await browser.close()
             return []
 
@@ -45,23 +46,33 @@ async def fetch_facebook_deals(query: str, region: str):
     access_token = 'YOUR_ACCESS_TOKEN'  # استبدل برمز الوصول الخاص بك
     url = f"https://graph.facebook.com/v12.0/search?type=page&q={query}&access_token={access_token}"
     
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        # معالجة البيانات لجلب العروض
-        return data.get('data', [])
-    return []
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('data', [])
+        else:
+            print(f"Error fetching Facebook deals: {response.status_code} - {response.text}")
+            return []
+    except Exception as e:
+        print(f"Error fetching Facebook deals: {e}")
+        return []
 
 async def fetch_instagram_deals(query: str, region: str):
     access_token = 'YOUR_ACCESS_TOKEN'  # استبدل برمز الوصول الخاص بك
     url = f"https://graph.instagram.com/me/media?fields=id,caption&access_token={access_token}"
     
-    response = requests.get(url)
-    if response.status_code == 200:
-        data = response.json()
-        # معالجة البيانات لجلب العروض
-        return data.get('data', [])
-    return []
+    try:
+        response = requests.get(url)
+        if response.status_code == 200:
+            data = response.json()
+            return data.get('data', [])
+        else:
+            print(f"Error fetching Instagram deals: {response.status_code} - {response.text}")
+            return []
+    except Exception as e:
+        print(f"Error fetching Instagram deals: {e}")
+        return []
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
@@ -69,11 +80,14 @@ async def home(request: Request):
 
 @app.get("/best-deal", response_class=HTMLResponse)
 async def best_deal(request: Request, query: str = "عروض كارفور", region: str = "الأردن"):
-    # استدعاء صائد العروض من فيسبوك وإنستغرام
-    deals = await fetch_social_media_deals(query, region)
-    
-    return templates.TemplateResponse("index.html", {
-        "request": request,
-        "query": query,
-        "deals": deals  # نرسل العروض لتعرضها في الواجهة
-    })
+    try:
+        # استدعاء صائد العروض من فيسبوك وإنستغرام
+        deals = await fetch_social_media_deals(query, region)
+        return templates.TemplateResponse("index.html", {
+            "request": request,
+            "query": query,
+            "deals": deals  # نرسل العروض لتعرضها في الواجهة
+        })
+    except Exception as e:
+        print(f"Error in best_deal: {e}")
+        raise HTTPException(status_code=500, detail="حدث خطأ داخلي في الخادم.")
