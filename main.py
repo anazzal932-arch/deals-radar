@@ -1,56 +1,35 @@
 from fastapi import FastAPI
 import requests
 from bs4 import BeautifulSoup
-import re
 
 app = FastAPI()
 
-# قائمة المواقع المستهدفة 🛒
-STORES = [
-    {"name": "عروض الأردن", "url": "https://3rodh.com/jordan-offers"},
-    {"name": "لبيب عروض", "url": "https://www.labeb.com/ar/offers/jordan"}
-]
+# سنستخدم موقعاً عالمياً بسيطاً جداً لنرى إذا كان الرادار "يصطاد" نصوصاً أصلاً
+TEST_STORE = {"name": "موقع اختبار", "url": "https://example.com"}
 
 @app.get("/")
 def home():
-    return {"status": "online", "message": "الرادار يعمل بكامل طاقته 🛰️"}
+    return {"message": "رادار العروض نشط 🛰️"}
 
 @app.get("/deals")
 def get_deals():
-    all_results = []
-    
-    # بطاقة الهوية (Headers) للتنكر كمتصفح حقيقي 🕵️‍♂️
-    headers = {
-        'User-Agent': 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36',
-        'Accept-Language': 'ar,en-US;q=0.9',
-        'Referer': 'https://www.google.com/'
-    }
-
-    for store in STORES:
-        try:
-            # إرسال الطلب مع الـ Headers 🚀
-            response = requests.get(store["url"], headers=headers, timeout=15)
+    try:
+        # 1. محاولة جلب الموقع
+        headers = {'User-Agent': 'Mozilla/5.0'}
+        response = requests.get(TEST_STORE["url"], headers=headers, timeout=10)
+        
+        # 2. إذا نجح الاتصال
+        if response.status_code == 200:
+            soup = BeautifulSoup(response.content, 'html.parser')
+            # لنجلب كل العناوين (h1) والفقرات (p)
+            text_data = [t.get_text() for t in soup.find_all(['h1', 'p'])]
             
-            if response.status_code == 200:
-                # استخدام BeautifulSoup لتحليل الغابة البرمجية للموقع 🥣
-                soup = BeautifulSoup(response.content, 'html.parser')
-                
-                # البحث عن العناوين التي تحتوي على كلمة "عرض" أو أسعار
-                elements = soup.find_all(['h2', 'h3', 'p', 'span'])
-                
-                for el in elements:
-                    text = el.get_text(strip=True)
-                    # تصفية النصوص المهمة فقط (التي تحتوي على أرقام أو كلمات عرض)
-                    if any(key in text for key in ["عرض", "دينار", "JD", "JOD"]) and len(text) > 5:
-                        all_results.append({
-                            "المتجر 🏬": store["name"],
-                            "العرض 📄": text[:100]
-                        })
-        except Exception as e:
-            print(f"Error at {store['name']}: {e}")
-            continue
-
-    # إزالة التكرار لضمان نظافة البيانات
-    unique_deals = [dict(t) for t in {tuple(d.items()) for d in all_results}]
-    
-    return unique_deals if unique_deals else {"message": "الرادار لم يجد عروضاً جديدة حالياً 🛰️"}
+            return {
+                "المحل": TEST_STORE["name"],
+                "النصوص التي اصطادها الرادار 🎣": text_data
+            }
+        else:
+            return {"error": f"الموقع رد برمز خطأ: {response.status_code}"}
+            
+    except Exception as e:
+        return {"error": f"تعذر الوصول للموقع: {str(e)}"}
