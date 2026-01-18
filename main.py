@@ -3,7 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from playwright.async_api import async_playwright
 import urllib.parse
-import requests
+import httpx  # استخدم httpx بدلاً من requests
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -46,33 +46,35 @@ async def fetch_facebook_deals(query: str, region: str):
     access_token = 'YOUR_ACCESS_TOKEN'  # استبدل برمز الوصول الخاص بك
     url = f"https://graph.facebook.com/v12.0/search?type=page&q={query}&access_token={access_token}"
     
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
             data = response.json()
             return data.get('data', [])
-        else:
-            print(f"Error fetching Facebook deals: {response.status_code} - {response.text}")
+        except httpx.HTTPStatusError as e:
+            print(f"Error fetching Facebook deals: {e.response.status_code} - {e.response.text}")
             return []
-    except Exception as e:
-        print(f"Error fetching Facebook deals: {e}")
-        return []
+        except Exception as e:
+            print(f"Error fetching Facebook deals: {e}")
+            return []
 
 async def fetch_instagram_deals(query: str, region: str):
     access_token = 'YOUR_ACCESS_TOKEN'  # استبدل برمز الوصول الخاص بك
     url = f"https://graph.instagram.com/me/media?fields=id,caption&access_token={access_token}"
     
-    try:
-        response = requests.get(url)
-        if response.status_code == 200:
+    async with httpx.AsyncClient() as client:
+        try:
+            response = await client.get(url)
+            response.raise_for_status()
             data = response.json()
             return data.get('data', [])
-        else:
-            print(f"Error fetching Instagram deals: {response.status_code} - {response.text}")
+        except httpx.HTTPStatusError as e:
+            print(f"Error fetching Instagram deals: {e.response.status_code} - {e.response.text}")
             return []
-    except Exception as e:
-        print(f"Error fetching Instagram deals: {e}")
-        return []
+        except Exception as e:
+            print(f"Error fetching Instagram deals: {e}")
+            return []
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
