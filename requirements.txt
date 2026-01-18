@@ -5,3 +5,6 @@ beautifulsoup4
 lxml
 feedparser
 jinja2
+playwright
+requests
+beautifulsoup4
