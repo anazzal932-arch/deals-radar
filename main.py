@@ -3,6 +3,7 @@ from fastapi.templating import Jinja2Templates
 from fastapi.responses import HTMLResponse
 from playwright.async_api import async_playwright
 import urllib.parse
+import requests
 
 app = FastAPI()
 templates = Jinja2Templates(directory="templates")
@@ -10,11 +11,9 @@ templates = Jinja2Templates(directory="templates")
 async def fetch_image_deals(query: str):
     """الرادار المتطور لصيد صور الكتالوجات 🛰️"""
     async with async_playwright() as p:
-        # تشغيل المتصفح (تأكد من تعديل Build Command في Render كما اتفقنا)
         browser = await p.chromium.launch(headless=True)
         page = await browser.new_page()
         
-        # تحويل البحث إلى صيغة صور جوجل مع فلتر 'أحدث النتائج'
         encoded_query = urllib.parse.quote(f"{query} الأردن 2026")
         url = f"https://www.google.com/search?q={encoded_query}&tbm=isch&tbs=qdr:w"
         
@@ -35,17 +34,46 @@ async def fetch_image_deals(query: str):
             await browser.close()
             return []
 
+async def fetch_social_media_deals(query: str, region: str):
+    """جلب العروض من فيسبوك وإنستغرام حسب المنطقة"""
+    facebook_deals = await fetch_facebook_deals(query, region)
+    instagram_deals = await fetch_instagram_deals(query, region)
+    
+    return facebook_deals + instagram_deals
+
+async def fetch_facebook_deals(query: str, region: str):
+    access_token = 'YOUR_ACCESS_TOKEN'  # استبدل برمز الوصول الخاص بك
+    url = f"https://graph.facebook.com/v12.0/search?type=page&q={query}&access_token={access_token}"
+    
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        # معالجة البيانات لجلب العروض
+        return data.get('data', [])
+    return []
+
+async def fetch_instagram_deals(query: str, region: str):
+    access_token = 'YOUR_ACCESS_TOKEN'  # استبدل برمز الوصول الخاص بك
+    url = f"https://graph.instagram.com/me/media?fields=id,caption&access_token={access_token}"
+    
+    response = requests.get(url)
+    if response.status_code == 200:
+        data = response.json()
+        # معالجة البيانات لجلب العروض
+        return data.get('data', [])
+    return []
+
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
     return templates.TemplateResponse("index.html", {"request": request, "query": "", "deals": []})
 
 @app.get("/best-deal", response_class=HTMLResponse)
-async def best_deal(request: Request, query: str = "عروض كارفور"):
-    # استدعاء صائد الصور بناءً على كلمة البحث 🕵️‍♂️
-    images = await fetch_image_deals(query)
+async def best_deal(request: Request, query: str = "عروض كارفور", region: str = "الأردن"):
+    # استدعاء صائد العروض من فيسبوك وإنستغرام
+    deals = await fetch_social_media_deals(query, region)
     
     return templates.TemplateResponse("index.html", {
         "request": request,
         "query": query,
-        "deals": images  # نرسل الروابط لتعرضها البطاقات التي صممناها
+        "deals": deals  # نرسل العروض لتعرضها في الواجهة
     })
