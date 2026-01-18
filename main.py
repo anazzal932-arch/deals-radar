@@ -1,14 +1,3 @@
-from fastapi import FastAPI
-import feedparser
-import re
-import urllib.parse
-
-app = FastAPI()
-
-@app.get("/")
-def home():
-    return {"الحالة": "الرادار الذكي نشط 🛰️", "نصيحة": "جرب /best-deal?query=سكر"}
-
 def google_rss_search(query: str):
     # ترميز البحث للغة العربية 🛠️
     encoded_query = urllib.parse.quote(f"{query} عروض الأردن")
@@ -18,25 +7,31 @@ def google_rss_search(query: str):
     deals = []
 
     for entry in feed.entries:
-        # البحث في العنوان والوصف لزيادة فرص الصيد 🎣
         full_text = entry.title + " " + entry.get("summary", "")
         
-        # محاولة استخراج السعر 💰
-        price_match = re.search(r"(\d+(\.\d+)?)\s?(دينار|JD|JOD)", full_text)
-        price = float(price_match.group(1)) if price_match else None
+        # 1. تطوير الصنارة: البحث عن الأرقام العربية (١٥٠) والإنجليزية (150) 🎣
+        # أضفنا \u0660-\u0669 للتعرف على الأرقام الهندية المستخدمة في العربية
+        price_match = re.search(r"([\d\u0660-\u0669]+(\.[\d\u0660-\u0669]+)?)\s?(دينار|JD|JOD|د\.أ)", full_text)
+        
+        # تحويل السعر المكتشف إلى رقم حقيقي (Float) للترتيب 💸
+        price = None
+        if price_match:
+            price_str = price_match.group(1)
+            # كود بسيط لتحويل الأرقام العربية إلى إنجليزية إذا وجدت
+            arabic_digits = "٠١٢٣٤٥٦٧٨٩"
+            english_digits = "0123456789"
+            translation_table = str.maketrans(arabic_digits, english_digits)
+            price = float(price_str.translate(translation_table))
+
+        # 2. تنظيف العنوان: حذف اسم الموقع من العنوان 🏛️
+        clean_title = entry.title.split(" - ")[0]
 
         deals.append({
-            "العرض 🛒": entry.title,
-            "السعر المستخرج 💸": price if price else "راجع الرابط",
+            "المنتج 🛒": clean_title,
+            "السعر المستخرج 💸": price if price else "يحدد لاحقاً",
             "المصدر 🏛️": entry.source.title if hasattr(entry, 'source') else "جوجل",
             "الرابط 🔗": entry.link
         })
-    return deals
-
-@app.get("/best-deal")
-def best_deal(query: str = "سكر"):
-    results = google_rss_search(query)
-    if not results:
-        return {"المنتج": query, "النتيجة": "❌ لم يتم العثور على نتائج، جرب كلمة أخرى"}
     
-    return {"البحث عن": query, "النتائج المكتشفة 🔍": results}
+    # 3. ترتيب النتائج: الأرخص أولاً (إذا وُجد السعر) 📉
+    return sorted(deals, key=lambda x: (x["السعر المستخرج 💸"] is None, x["السعر المستخرج 💸"]))
