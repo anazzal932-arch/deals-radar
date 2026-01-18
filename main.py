@@ -17,22 +17,26 @@ def google_rss_search(query: str):
     encoded_query = urllib.parse.quote(f"{query} عروض الأردن")
     url = f"https://news.google.com/rss/search?q={encoded_query}&hl=ar&gl=JO&ceid=JO:ar"
     
-    feed = feedparser.parse(url)
-    deals = []
+    try:
+        feed = feedparser.parse(url)
+        deals = []
 
-    for entry in feed.entries:
-        text = entry.title
-        # البحث عن الأسعار (مثلاً: 5 دينار أو 5.99 JD) 💸
-        price_match = re.search(r"(\d+(\.\d+)?)\s?(دينار|JD|JOD)", text)
+        for entry in feed.entries:
+            text = entry.title
+            # البحث عن الأسعار (مثلاً: 5 دينار أو 5.99 JD) 💸
+            price_match = re.search(r"(\d+(\.\d+)?)\s?(دينار|JD|JOD)", text)
 
-        if price_match:
-            deals.append({
-                "العرض 🛒": entry.title,
-                "السعر 💰": float(price_match.group(1)),
-                "المصدر 🏛️": entry.source.title if hasattr(entry, 'source') else "جوجل",
-                "الرابط 🔗": entry.link
-            })
-    return deals
+            if price_match:
+                deals.append({
+                    "العرض 🛒": entry.title,
+                    "السعر 💰": float(price_match.group(1)),
+                    "المصدر 🏛️": entry.source.title if hasattr(entry, 'source') else "جوجل",
+                    "الرابط 🔗": entry.link
+                })
+        return deals
+    except Exception as e:
+        print(f"Error occurred: {e}")
+        return []
 
 @app.get("/best-deal")
 def best_deal(query: str = "سكر"):
