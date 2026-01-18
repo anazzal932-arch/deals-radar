@@ -49,8 +49,9 @@ async def fetch_facebook_deals(query: str, region: str):
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url)
-            response.raise_for_status()
+            response.raise_for_status()  # سيثير استثناء إذا كانت الاستجابة غير 2xx
             data = response.json()
+            print("Facebook Deals Data:", data)  # طباعة البيانات المسترجعة
             return data.get('data', [])
         except httpx.HTTPStatusError as e:
             print(f"Error fetching Facebook deals: {e.response.status_code} - {e.response.text}")
@@ -66,8 +67,9 @@ async def fetch_instagram_deals(query: str, region: str):
     async with httpx.AsyncClient() as client:
         try:
             response = await client.get(url)
-            response.raise_for_status()
+            response.raise_for_status()  # سيثير استثناء إذا كانت الاستجابة غير 2xx
             data = response.json()
+            print("Instagram Deals Data:", data)  # طباعة البيانات المسترجعة
             return data.get('data', [])
         except httpx.HTTPStatusError as e:
             print(f"Error fetching Instagram deals: {e.response.status_code} - {e.response.text}")
