@@ -35,11 +35,12 @@ async def fetch_image_deals(query: str, region: str = "الأردن"):
             return deals
         except Exception as e:
             print(f"خطأ في الرادار: {e}")
+            print(f"Traceback: {e.__traceback__}")
             return []
 
 @app.get("/", response_class=HTMLResponse)
 async def home(request: Request):
-    return templates.TemplateResponse("index.html", {"request": request, "query": "", "deals": []})
+    return templates.TemplateResponse("index.html", {"request": request, "query": "", "region": "", "deals": []})
 
 @app.get("/best-deal", response_class=HTMLResponse)
 async def best_deal(request: Request, query: str = "عروض", region: str = "الأردن"):
@@ -54,4 +55,5 @@ async def best_deal(request: Request, query: str = "عروض", region: str = "ا
         })
     except Exception as e:
         print(f"خطأ في best_deal: {e}")
+        print(f"Traceback: {e.__traceback__}")
         raise HTTPException(status_code=500, detail="حدث خطأ داخلي في الخادم.")
