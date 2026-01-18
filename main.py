@@ -1,47 +1,50 @@
 from fastapi import FastAPI
-import requests
-from bs4 import BeautifulSoup
+import feedparser
 import re
 
 app = FastAPI()
 
-HEADERS = {
-    "User-Agent": "Mozilla/5.0",
-    "Accept-Language": "ar,en-US;q=0.9"
-}
-
-KEYWORDS = ["عرض", "خصم", "دينار", "JD"]
+KEYWORDS = ["دينار", "JD"]
 
 @app.get("/")
 def home():
-    return {"status": "Smart Radar Online 🛰️"}
+    return {"status": "Smart Deals Radar 🛰️ (Google RSS Mode)"}
 
-@app.get("/best-deal")
-def best_deal(query: str = "سكر"):
-    google_url = f"https://www.google.com/search?q={query}+عرض+دينار+الأردن"
-
-    r = requests.get(google_url, headers=HEADERS, timeout=10)
-    soup = BeautifulSoup(r.text, "html.parser")
+def google_rss_search(query: str):
+    url = f"https://news.google.com/rss/search?q={query}+عرض+دينار+الأردن"
+    feed = feedparser.parse(url)
 
     deals = []
 
-    for g in soup.select("div"):
-        text = g.get_text(" ", strip=True)
+    for entry in feed.entries:
+        text = entry.title + " " + entry.get("summary", "")
+        price_match = re.search(r"(\d+(\.\d+)?)\s?(دينار|JD)", text)
 
-        if any(k in text for k in KEYWORDS):
-            price_match = re.search(r"(\d+(\.\d+)?)\s?(JD|دينار)", text)
-            if price_match:
-                deals.append({
-                    "النص": text[:200],
-                    "السعر": float(price_match.group(1))
-                })
+        if price_match:
+            deals.append({
+                "المنتج": query,
+                "السعر": float(price_match.group(1)),
+                "المصدر": entry.source.title if "source" in entry else "Google",
+                "العنوان": entry.title,
+                "الرابط": entry.link
+            })
+
+    return deals
+
+@app.get("/best-deal")
+def best_deal(query: str = "سكر"):
+    deals = google_rss_search(query)
 
     if not deals:
-        return {"message": "لم يتم العثور على عروض حالياً"}
+        return {
+            "المنتج": query,
+            "النتيجة": "❌ لا يوجد عروض حالياً"
+        }
 
     best = min(deals, key=lambda x: x["السعر"])
 
     return {
         "المنتج": query,
-        "أفضل عرض 🏆": best
+        "أفضل عرض 🏆": best,
+        "عدد العروض التي تم فحصها": len(deals)
     }
