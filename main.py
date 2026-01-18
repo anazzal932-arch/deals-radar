@@ -1,55 +1,47 @@
 from fastapi import FastAPI
 import requests
 from bs4 import BeautifulSoup
+import re
 
 app = FastAPI()
 
-STORES = [
-    {"name": "عروض لبيب", "url": "https://www.labeb.com/ar/offers"},
-    {"name": "Example (اختبار)", "url": "https://example.com"},
-]
-
 HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64)",
-    "Accept-Language": "ar,en-US;q=0.9",
+    "User-Agent": "Mozilla/5.0",
+    "Accept-Language": "ar,en-US;q=0.9"
 }
 
-KEYWORDS = ["دينار", "خصم", "عرض", "JD", "%"]
+KEYWORDS = ["عرض", "خصم", "دينار", "JD"]
 
 @app.get("/")
 def home():
-    return {"status": "Radar Online 🛰️"}
+    return {"status": "Smart Radar Online 🛰️"}
 
-@app.get("/deals")
-def get_deals():
-    results = []
+@app.get("/best-deal")
+def best_deal(query: str = "سكر"):
+    google_url = f"https://www.google.com/search?q={query}+عرض+دينار+الأردن"
 
-    for store in STORES:
-        try:
-            r = requests.get(store["url"], headers=HEADERS, timeout=10)
+    r = requests.get(google_url, headers=HEADERS, timeout=10)
+    soup = BeautifulSoup(r.text, "html.parser")
 
-            if r.status_code != 200 or len(r.text) < 800:
-                raise Exception("محتوى غير صالح")
+    deals = []
 
-            soup = BeautifulSoup(r.text, "html.parser")
-            found = []
+    for g in soup.select("div"):
+        text = g.get_text(" ", strip=True)
 
-            for tag in soup.find_all(["h1", "h2", "h3", "p", "li"]):
-                text = tag.get_text(strip=True)
-                if any(k in text for k in KEYWORDS) and len(text) > 10:
-                    found.append(text)
+        if any(k in text for k in KEYWORDS):
+            price_match = re.search(r"(\d+(\.\d+)?)\s?(JD|دينار)", text)
+            if price_match:
+                deals.append({
+                    "النص": text[:200],
+                    "السعر": float(price_match.group(1))
+                })
 
-            results.append({
-                "المحل 🏬": store["name"],
-                "الحالة": "نجح ✅",
-                "العروض": list(set(found[:8]))
-            })
+    if not deals:
+        return {"message": "لم يتم العثور على عروض حالياً"}
 
-        except:
-            results.append({
-                "المحل 🏬": store["name"],
-                "الحالة": "محمي / JavaScript ⚠️",
-                "العروض": []
-            })
+    best = min(deals, key=lambda x: x["السعر"])
 
-    return {"Radar Report 🛰️": results}
+    return {
+        "المنتج": query,
+        "أفضل عرض 🏆": best
+    }
