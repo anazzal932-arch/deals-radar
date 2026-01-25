@@ -1,2 +1,0 @@
-# deals-radar
-Neighborradar
